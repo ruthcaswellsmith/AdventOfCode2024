@@ -17,27 +17,16 @@ class Report:
     @property
     def has_safe_diffs(self):
         diffs = [abs(self.data[i] - self.data[i+1]) for i in range(len(self.data) - 1)]
-        if min(diffs) < 1 or max(diffs) > 3:
-            return False
-        return True
+        return 1 <= min(diffs) and max(diffs) <= 3
 
     @property
     def is_safe(self):
-        if not (self.is_decreasing or self.is_increasing):
-            return False
-        if not self.has_safe_diffs:
-            return False
-        return True
+        return (self.is_decreasing or self.is_increasing) and self.has_safe_diffs
 
     @property
     def can_be_made_safe(self):
-        if self.is_safe:
-            return True
-        for i in range(len(self.data)):
-            new_report = Report(self.data[:i] + self.data[i+1:])
-            if new_report.is_safe:
-                return True
-        return False
+        return self.is_safe or any(Report(self.data[:i] + self.data[i + 1:]).is_safe
+                                   for i in range(len(self.data)))
 
 
 if __name__ == '__main__':
