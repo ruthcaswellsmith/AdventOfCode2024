@@ -21,7 +21,6 @@ class Guard:
                 self.start = (i, line.index('^'))
         self.pos = list(self.start)
         self.dir = Direction.NORTH
-        self.steps = 0
 
     @property
     def in_a_loop(self):
@@ -47,7 +46,6 @@ class Guard:
     def update_pos(self):
         self.pos[0] += self.dir.value[0]
         self.pos[1] += self.dir.value[1]
-        self.steps += 1
 
     def move(self):
         while True:
@@ -76,18 +74,18 @@ if __name__ == '__main__':
 
     guard = Guard(data)
     guard.move()
-    original_visited = guard.visited.copy()
-    print(f"The answer to part 1 is {len(guard.visited)}")
+    original_visited = {pos for pos, direction in guard.visited}
+    print(f"The answer to part 1 is {len(original_visited)}")
 
     possible_loops = 0
-    # Go through and try putting an obstacle in spots along original path
-    for new_obstacle in {pos for pos, direction in original_visited}:
-        if new_obstacle != guard.start:
+    # Try putting a single obstacle in each spot on the original path
+    for loc in original_visited:
+        if loc != guard.start:
             guard = Guard(data)
-            line = guard.grid[new_obstacle[0]]
-            guard.grid[new_obstacle[0]] = line[:new_obstacle[1]] + '#' + line[new_obstacle[1]+1:]
+            line = guard.grid[loc[0]]
+            guard.grid[loc[0]] = line[:loc[1]] + '#' + line[loc[1]+1:]
             guard.move()
             if guard.in_a_loop:
-                print(f"found a loop {new_obstacle}")
+                print(f"found a loop {loc}")
                 possible_loops += 1
     print(f"The answer to part 2 is {possible_loops}")
