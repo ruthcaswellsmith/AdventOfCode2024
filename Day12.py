@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from collections import defaultdict
 import numpy as np
 
@@ -15,76 +15,41 @@ class Map:
         self.start_of_region = None
         self.letter = None
 
+    def on_the_grid(self, pos: Tuple[int]) -> bool:
+        return True if 0 <= pos[0] <= self.max_x and 0 <= pos[1] <= self.max_y else False
+
     def assign_regions(self):
         unassigned_coords = [[int(coord[0]), int(coord[1])] for coord in np.argwhere(self.region_map == 0)]
         while len(unassigned_coords) > 0:
-            # Get a new value to start with
+
             self.start_of_region = unassigned_coords[0]
             self.letter = self.grid[self.start_of_region[0]][self.start_of_region[1]]
             self.region_num += 1
-            self.regions[self.region_num] = {'letter': self.letter, 'perimeter': 0, 'area': 0}
             self.region_map[tuple(self.start_of_region)] = self.region_num
-            # Expand region around this coordinate
-            self.expand_region(self.start_of_region)
+            perimeter = self.expand_region(self.start_of_region)
+            area = np.count_nonzero(self.region_map == self.region_num)
+            self.regions[self.region_num] = {'letter': self.letter, 'perimeter': perimeter, 'area': area}
             unassigned_coords = [[int(coord[0]), int(coord[1])] for coord in np.argwhere(self.region_map == 0)]
 
     def expand_region(self, pos: List[int]):
-        # search to the east
-        if pos[1] < self.max_y and self.grid[pos[0]][pos[1] + 1] == self.letter:
-            new_pos = tuple([pos[0], pos[1] + 1])
-            if self.region_map[new_pos] == 0:
-                self.region_map[new_pos] = self.region_num
-                self.expand_region(list(new_pos))
-        # search to the south
-        if pos[0] < self.max_x and self.grid[pos[0]+1][pos[1]] == self.letter:
-            new_pos = tuple([pos[0]+1, pos[1]])
-            if self.region_map[new_pos] == 0:
-                self.region_map[new_pos] = self.region_num
-                self.expand_region(list(new_pos))
-        # search to the west
-        if pos[0] > 0 and self.grid[pos[0]][pos[1]-1] == self.letter:
-            new_pos = tuple([pos[0], pos[1]-1])
-            if self.region_map[new_pos] == 0:
-                self.region_map[new_pos] = self.region_num
-                self.expand_region(list(new_pos))
-        # search to the north
-        if pos[1] > self.max_y and self.grid[pos[0]-1][pos[1]] == self.letter:
-            new_pos = tuple([pos[0]-1, pos[1]])
-            if self.region_map[new_pos] == 0:
-                self.region_map[new_pos] = self.region_num
-                self.expand_region(list(new_pos))
-
-    def calc_perimeter(self):
-        for region in self.regions.keys():
-            perimeter = 0
-            area = 0
-            for i in range(self.max_x + 1):
-                for j in range(self.max_y + 1):
-                    if self.region_map[(i, j)] == region:
-                        area += 1
-                        # Check above
-                        if i == 0 or self.region_map[i - 1][j] != region:
-                            perimeter += 1
-                        # Check below
-                        if i == self.max_x or self.region_map[i + 1][j] != region:
-                            perimeter += 1
-                        # Check to the right
-                        if j == self.max_y or self.region_map[i][j + 1] != region:
-                            perimeter += 1
-                        # Check to the left
-                        if j == 0 or self.region_map[i][j - 1] != region:
-                            perimeter += 1
-            self.regions[region]['perimeter'] = perimeter
-            self.regions[region]['area'] = area
+        perimeter = 0
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            new_pos = (pos[0] + dx, pos[1] + dy)
+            if self.on_the_grid(new_pos) and self.grid[new_pos[0]][new_pos[1]] == self.letter:
+                if self.region_map[new_pos] == 0:
+                    self.region_map[new_pos] = self.region_num
+                    perimeter += self.expand_region(list(new_pos))
+            else:
+                perimeter += 1
+        return perimeter
 
 
 if __name__ == '__main__':
-    filename = 'input/test3.txt'
+    filename = 'input/Day12.txt'
     data = read_file(filename)
 
     map = Map(data)
     map.assign_regions()
-    map.calc_perimeter()
     print(f"The answer to part 1 is {sum([region['perimeter'] * region['area'] for region in map.regions.values()])}")
     #
     # stones = Stones(data)
