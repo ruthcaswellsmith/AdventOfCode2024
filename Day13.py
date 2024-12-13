@@ -1,5 +1,4 @@
 from typing import List
-from decimal import Decimal
 
 from utils import read_file, Part
 
@@ -9,9 +8,9 @@ class ClawMachine:
         self.moves = []
         for i in range(2):
             pts = data[i].split(':')
-            self.moves.append([Decimal(pt.strip().strip('X+').strip('Y+')) for pt in pts[1].split(',')])
+            self.moves.append([int(pt.strip().strip('X+').strip('Y+')) for pt in pts[1].split(',')])
         pts = data[2].split(':')
-        self.prize = [Decimal(pt.strip().strip('X=').strip('Y=')) for pt in pts[1].split(',')]
+        self.prize = [int(pt.strip().strip('X=').strip('Y=')) for pt in pts[1].split(',')]
         if part == Part.PT2:
             self.prize = [10_000_000_000_000 + prize for prize in self.prize]
         self.pushes = []
