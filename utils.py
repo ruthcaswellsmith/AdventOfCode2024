@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import List, Tuple, TypeVar, Union
+from typing import Dict, List, Tuple, TypeVar, Union
 from functools import total_ordering
 import re
 
@@ -274,7 +274,7 @@ class GraphNode:
 
 
 class Graph:
-    def __init__(self, nodes: List[GraphNode], edge_costs: np.array):
+    def __init__(self, nodes: List[GraphNode], edge_costs: Dict):
         self.nodes = nodes
         self.edge_costs = edge_costs
         self.shortest_paths = edge_costs.copy()
@@ -296,9 +296,9 @@ class Graph:
 
     def find_all_shortest_paths(self):
         for n in self.nodes:
-            self.__find_shortest_paths(n)
+            self.find_shortest_paths(n)
 
-    def __find_shortest_paths(self, starting_node: GraphNode):
+    def find_shortest_paths(self, starting_node: GraphNode):
         self.visited, self.current_cost = [], 0
         for n in self.nodes:
             n.cost = LARGE
@@ -324,7 +324,7 @@ class Graph:
     def __update_costs_for_neighbors(self, current: GraphNode, neighbors: List[GraphNode]):
         for neighbor in neighbors:
             neighbor.cost = min(neighbor.cost,
-                                current.cost + self.edge_costs[current.id, neighbor.id])
+                                current.cost + self.edge_costs[(current.id, neighbor.id)])
 
 
 class CharRemover:
