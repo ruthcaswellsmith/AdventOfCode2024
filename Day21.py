@@ -1,5 +1,7 @@
 from typing import List, Dict
 from utils import read_file
+from functools import lru_cache
+from itertools import product
 
 
 NUMERIC_KEYPAD = {
@@ -32,6 +34,7 @@ class Keypad:
         self.distances, self.next = self.find_shortest_paths()
         self.shortest_paths = self.get_shortest_paths()
 
+    @lru_cache
     def get_graph_and_directions(self):
         graph, directions = {}, {}
         for button, neighbors in self.keypad.items():
@@ -40,6 +43,7 @@ class Keypad:
                 directions[f"{button}-{b}"] = d
         return graph, directions
 
+    @lru_cache
     def find_shortest_paths(self):
         dist = {node: {n: float('inf') for n in self.graph} for node in self.graph}
         next = {node: {n: [] for n in self.graph} for node in self.graph}
@@ -76,6 +80,7 @@ class Keypad:
                     paths.extend(self.reconstruct_paths(neighbor, end, new_path, visited.copy()))
         return paths
 
+    @lru_cache
     def get_shortest_paths(self):
         shortest_paths = {}
         for n1 in self.graph:
@@ -88,35 +93,44 @@ class Door:
     def __init__(self, data: List[str], num_robots: int):
         self.codes = data
         self.numeric = Keypad(NUMERIC_KEYPAD)
-        self.directionals = [Keypad(DIRECTIONAL_KEYPAD) for i in range(num_robots)]
+        self.directionals = [Keypad(DIRECTIONAL_KEYPAD) for _ in range(num_robots)]
         self.code_to_buttons = {}
 
     @property
     def answer_pt1(self):
-        return [(len(b), int(c[:-1])) for c, b in self.code_to_buttons.items()]
+        answer = 0
+        for code, list_of_buttons in self.code_to_buttons.items():
+            shortest = min([len(b) for b in list_of_buttons])
+            answer += shortest * int(code[:-1])
+        return answer
 
     def process_codes(self):
-        for code in ['029A']:
-            desired_path = 'A' + code
-            buttons = ""
-            for i in range(1, len(desired_path)):
-                a_shortest_path = self.numeric.shortest_paths[(desired_path[i - 1], desired_path[i])][0]
-                for j in range(1, len(a_shortest_path)):
-                    buttons += self.numeric.directions[f"{a_shortest_path[j - 1]}-{a_shortest_path[j]}"]
-                buttons += 'A'
-            print(f"buttons {buttons}")
+        for code in self.codes:
+            self.process_code(code)
 
-            for keypad in self.directionals:
-                desired_path = 'A' + buttons
-                buttons = ""
-                for i in range(1, len(desired_path)):
-                    a_shortest_path = keypad.shortest_paths[(desired_path[i - 1], desired_path[i])][0]
-                    for j in range(1, len(a_shortest_path)):
-                        buttons += keypad.directions[f"{a_shortest_path[j - 1]}-{a_shortest_path[j]}"]
-                    buttons += 'A'
-                print(f"buttons {buttons}")
-            self.code_to_buttons[code] = buttons
-            print(self.code_to_buttons[code])
+    @lru_cache()
+    def process_code(self, code: str):
+        list_of_buttons = [code]
+        self.code_to_buttons[code] = []
+        for k_ind, keypad in enumerate([self.numeric] + self.directionals):
+            next_level_buttons = []
+            for buttons in list_of_buttons:
+                buttons = 'A' + buttons
+                new_buttons = []
+                for i in range(len(buttons) - 1):
+                    new_buttons.append(keypad.shortest_paths[(buttons[i], buttons[i + 1])])
+
+                for buttons_combo in list(product(*new_buttons)):
+                    buttons = ''
+                    for p in buttons_combo:
+                        buttons += ''.join(
+                            keypad.directions[f"{p[j]}-{p[j + 1]}"]
+                            for j in range(len(p) - 1)) + 'A'
+                    next_level_buttons.append(buttons)
+            list_of_buttons = next_level_buttons
+            print(code, k_ind + 1, len(list_of_buttons))
+            if k_ind == 2:
+                self.code_to_buttons[code].extend(list_of_buttons)
 
 
 if __name__ == '__main__':
