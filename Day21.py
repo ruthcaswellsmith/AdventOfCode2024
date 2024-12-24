@@ -1,7 +1,6 @@
 from typing import List, Dict
 from utils import read_file
 from functools import lru_cache
-from itertools import product
 
 
 NUMERIC_KEYPAD = {
@@ -31,20 +30,27 @@ class Keypad:
     def __init__(self, keypad: Dict):
         self.keypad = keypad
         self.graph, self.directions = self.get_graph_and_directions()
-        self.distances, self.next = self.find_shortest_paths()
+        self.distances, self.next = self.floyd_warshall()
         self.shortest_paths = self.get_shortest_paths()
 
-    @lru_cache
     def get_graph_and_directions(self):
         graph, directions = {}, {}
         for button, neighbors in self.keypad.items():
             graph[button] = list(neighbors.values())
             for d, b in neighbors.items():
-                directions[f"{button}-{b}"] = d
+                directions[f"{button}{b}"] = d
         return graph, directions
 
-    @lru_cache
-    def find_shortest_paths(self):
+    def get_shortest_paths(self):
+        shortest_paths = {}
+        for n1 in self.graph:
+            for n2 in self.graph:
+                if n1 != n2:
+                    paths = self.reconstruct_paths(n1, n2, set())
+                    shortest_paths[f"{n1}{n2}"] = [self.translate_path(path) for path in paths]
+        return shortest_paths
+
+    def floyd_warshall(self):
         dist = {node: {n: float('inf') for n in self.graph} for node in self.graph}
         next = {node: {n: [] for n in self.graph} for node in self.graph}
         for node in self.graph:
@@ -63,11 +69,7 @@ class Keypad:
                         next[i][j].extend(next[i][k])
         return dist, next
 
-    def reconstruct_paths(self, start, end, path=None, visited=None):
-        if path is None:
-            path = [start]
-        if visited is None:
-            visited = set()
+    def reconstruct_paths(self, path, end, visited):
         if path[-1] == end:
             return [path]
         paths = []
@@ -75,69 +77,58 @@ class Keypad:
             if neighbor not in visited:
                 if neighbor not in path:
                     visited.add(neighbor)
-                    new_path = list(path)
-                    new_path.append(neighbor)
-                    paths.extend(self.reconstruct_paths(neighbor, end, new_path, visited.copy()))
+                    paths.extend(self.reconstruct_paths(path + neighbor, end, visited.copy()))
         return paths
 
-    @lru_cache
-    def get_shortest_paths(self):
-        shortest_paths = {}
-        for n1 in self.graph:
-            for n2 in self.graph:
-                shortest_paths[(n1, n2)] = self.reconstruct_paths(n1, n2)
-        return shortest_paths
+    def translate_path(self, path: str):
+        translated_path = ''
+        for pair in [(path[i:i+2]) for i in range(len(path) - 1)]:
+            translated_path += self.directions[pair]
+        return translated_path
 
 
 class Door:
     def __init__(self, data: List[str], num_robots: int):
         self.codes = data
-        self.numeric = Keypad(NUMERIC_KEYPAD)
-        self.directionals = [Keypad(DIRECTIONAL_KEYPAD) for _ in range(num_robots)]
+        self.num_robots = num_robots
+        numeric = Keypad(NUMERIC_KEYPAD)
+        directional = Keypad(DIRECTIONAL_KEYPAD)
+        self.keypads = [numeric] + [directional] * num_robots
         self.code_to_buttons = {}
+        self.min_lengths = {}
 
     @property
-    def answer_pt1(self):
-        answer = 0
-        for code, list_of_buttons in self.code_to_buttons.items():
-            shortest = min([len(b) for b in list_of_buttons])
-            answer += shortest * int(code[:-1])
-        return answer
+    def answer(self):
+        return sum([length * int(code[:-1]) for code, length in self.min_lengths.items()])
 
-    def process_codes(self):
+    def find_min_lengths(self):
         for code in self.codes:
-            self.process_code(code)
+            self.min_lengths[code] = self.find_min_length(code, 0)
 
     @lru_cache()
-    def process_code(self, code: str):
-        list_of_buttons = [code]
-        self.code_to_buttons[code] = []
-        for k_ind, keypad in enumerate([self.numeric] + self.directionals):
-            next_level_buttons = []
-            for buttons in list_of_buttons:
-                buttons = 'A' + buttons
-                new_buttons = []
-                for i in range(len(buttons) - 1):
-                    new_buttons.append(keypad.shortest_paths[(buttons[i], buttons[i + 1])])
+    def find_min_length(self, buttons: str, level: int):
+        if level == self.num_robots + 1:
+            return len(buttons)
 
-                for buttons_combo in list(product(*new_buttons)):
-                    buttons = ''
-                    for p in buttons_combo:
-                        buttons += ''.join(
-                            keypad.directions[f"{p[j]}-{p[j + 1]}"]
-                            for j in range(len(p) - 1)) + 'A'
-                    next_level_buttons.append(buttons)
-            list_of_buttons = next_level_buttons
-            print(code, k_ind + 1, len(list_of_buttons))
-            if k_ind == 2:
-                self.code_to_buttons[code].extend(list_of_buttons)
+        min_length, buttons = 0, 'A' + buttons
+        for pair in [buttons[i:i+2] for i in range(len(buttons) - 1)]:
+            paths = self.keypads[level].shortest_paths.get(pair, "")
+            min_lengths = [self.find_min_length(p + 'A', level + 1) for p in paths]
+            if min_lengths:
+                min_length += min(min_lengths)
+            else:   # We're pushing same button twice so not traveling but it results in an A
+                min_length += 1
+        return min_length
 
 
 if __name__ == '__main__':
-    filename = 'input/Day21-test.txt'
+    filename = 'input/Day21.txt'
     data = read_file(filename)
 
     door = Door(data, 2)
-    door.process_codes()
-    print(f"The answer to part 1 is {door.answer_pt1}.")
+    door.find_min_lengths()
+    print(f"The answer to part 1 is {door.answer}.")
 
+    door = Door(data, 25)
+    door.find_min_lengths()
+    print(f"The answer to part 2 is {door.answer}.")
